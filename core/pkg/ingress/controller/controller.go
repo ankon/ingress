@@ -555,6 +555,12 @@ func (ic *GenericController) getDefaultUpstream() *ingress.Backend {
 	}
 
 	svc := svcObj.(*api.Service)
+	if len(svc.Spec.Ports) == 0 {
+		glog.Warningf("service %v does not have ports configured, using default backend", svcKey)
+		upstream.Endpoints = append(upstream.Endpoints, newDefaultServer())
+		return upstream
+	}
+
 	endps := ic.getEndpoints(svc, svc.Spec.Ports[0].TargetPort, api.ProtocolTCP, &healthcheck.Upstream{})
 	if len(endps) == 0 {
 		glog.Warningf("service %v does not have any active endpoints", svcKey)
