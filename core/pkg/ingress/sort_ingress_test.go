@@ -17,6 +17,8 @@ limitations under the License.
 package ingress
 
 import (
+	"sort"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -216,6 +218,20 @@ func buildServerByName() ServerByName {
 			Locations:      []*Location{},
 		},
 		{
+			Hostname:       "foo0",
+			SSLPassthrough: true,
+			SSLCertificate: "foo0_cert",
+			SSLPemChecksum: "foo0_pem",
+			Locations:      []*Location{},
+		},
+		{
+			Hostname:       "*.foo.com",
+			SSLPassthrough: false,
+			SSLCertificate: "foo4_cert",
+			SSLPemChecksum: "foo4_pem",
+			Locations:      []*Location{},
+		},
+		{
 			Hostname:       "_",
 			SSLPassthrough: false,
 			SSLCertificate: "foo4_cert",
@@ -227,18 +243,27 @@ func buildServerByName() ServerByName {
 
 func TestServerByNameLen(t *testing.T) {
 	fooTests := []struct {
-		servers ServerByName
-		el      int
+		servers  ServerByName
+		el       int
+		wildcard bool
 	}{
-		{[]*Server{}, 0},
-		{buildServerByName(), 4},
-		{nil, 0},
+		{[]*Server{}, 0, false},
+		{buildServerByName(), 6, true},
+		{nil, 0, false},
 	}
 
 	for _, fooTest := range fooTests {
+		sort.Sort(fooTest.servers)
 		r := fooTest.servers.Len()
 		if r != fooTest.el {
 			t.Errorf("returned %v but expected %v for the len of ServerByName: %v", r, fooTest.el, fooTest.servers)
+		}
+		if fooTest.wildcard {
+			s := fooTest.servers[0]
+			if !strings.HasPrefix(s.Hostname, "*.") {
+				t.Logf("%s", fooTest.servers)
+				t.Errorf("expected a wildcard hostname but %v was returned", s.Hostname)
+			}
 		}
 	}
 }
