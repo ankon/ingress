@@ -14,17 +14,17 @@
 
 FROM gcr.io/google_containers/nginx-slim:0.14
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
-  diffutils \
-  --no-install-recommends \
+RUN export DEBIAN_FRONTEND=noninteractive \
+  && apt-get update \
+  && apt-get install -y diffutils --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 COPY . /
 
 # https://blog.phusion.nl/2015/01/20/docker-and-the-pid-1-zombie-reaping-problem
-RUN curl -sSL -o /sbin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64 && \
-  chmod +x /sbin/dumb-init
+RUN curl -sSL -o /sbin/tini https://github.com/krallin/tini/releases/download/v0.14.0/tini-static-amd64 && \
+  chmod +x /sbin/tini
 
-ENTRYPOINT ["/sbin/dumb-init", "--"]
+ENTRYPOINT ["/sbin/tini", "-s", "-vvv", "--"]
 
 CMD ["/nginx-ingress-controller"]
