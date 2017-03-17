@@ -25,15 +25,14 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/api"
-
-	"strings"
+	api "k8s.io/client-go/pkg/api/v1"
 
 	"k8s.io/ingress/controllers/nginx/pkg/config"
 	ngx_template "k8s.io/ingress/controllers/nginx/pkg/template"

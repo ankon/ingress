@@ -23,14 +23,16 @@ import (
 	"testing"
 	"time"
 
-	cache_store "k8s.io/ingress/core/pkg/cache"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	testclient "k8s.io/client-go/kubernetes/fake"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/apis/extensions"
+	"k8s.io/client-go/tools/cache"
+	cache_ext "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
+
 	"k8s.io/ingress/core/pkg/k8s"
 	"k8s.io/ingress/core/pkg/task"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/cache"
-	testclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func buildLoadBalancerIngressByIP() loadBalancerIngressByIP {
@@ -58,7 +60,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 	return testclient.NewSimpleClientset(
 		&api.PodList{Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo1",
 					Namespace: api.NamespaceDefault,
 					Labels: map[string]string{
@@ -70,7 +72,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo2",
 					Namespace: api.NamespaceDefault,
 					Labels: map[string]string{
@@ -79,7 +81,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo3",
 					Namespace: api.NamespaceSystem,
 					Labels: map[string]string{
@@ -93,7 +95,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 		}},
 		&api.ServiceList{Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: api.NamespaceDefault,
 				},
@@ -104,7 +106,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo_non_exist",
 					Namespace: api.NamespaceDefault,
 				},
@@ -112,7 +114,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 		}},
 		&api.NodeList{Items: []api.Node{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo_node_1",
 				},
 				Status: api.NodeStatus{
@@ -128,7 +130,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo_node_2",
 				},
 				Status: api.NodeStatus{
@@ -147,7 +149,7 @@ func buildSimpleClientSet() *testclient.Clientset {
 		}},
 		&api.EndpointsList{Items: []api.Endpoints{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ingress-controller-leader",
 					Namespace: api.NamespaceDefault,
 				},
@@ -163,7 +165,7 @@ func fakeSynFn(interface{}) error {
 func buildExtensionsIngresses() []extensions.Ingress {
 	return []extensions.Ingress{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo_ingress_1",
 				Namespace: api.NamespaceDefault,
 			},
@@ -179,7 +181,7 @@ func buildExtensionsIngresses() []extensions.Ingress {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo_ingress_2",
 				Namespace: api.NamespaceDefault,
 			},
@@ -192,18 +194,18 @@ func buildExtensionsIngresses() []extensions.Ingress {
 	}
 }
 
-func buildIngressLIstener() cache_store.StoreToIngressLister {
+func buildIngressLIstener() cache_ext.IngressLister {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	ids := sets.NewString("foo_ingress_non_01")
 	for id := range ids {
 		store.Add(&extensions.Ingress{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      id,
 				Namespace: api.NamespaceDefault,
 			}})
 	}
 	store.Add(&extensions.Ingress{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo_ingress_1",
 			Namespace: api.NamespaceDefault,
 		},
@@ -264,7 +266,7 @@ func TestStatusActions(t *testing.T) {
 	newIPs := []api.LoadBalancerIngress{{
 		IP: "11.0.0.2",
 	}}
-	fooIngress1, err1 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_1")
+	fooIngress1, err1 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_1", meta_v1.GetOptions{})
 	if err1 != nil {
 		t.Fatalf("unexpected error")
 	}
@@ -277,7 +279,7 @@ func TestStatusActions(t *testing.T) {
 	fk.Shutdown()
 	// ingress should be empty
 	newIPs2 := []api.LoadBalancerIngress{}
-	fooIngress2, err2 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_1")
+	fooIngress2, err2 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_1", meta_v1.GetOptions{})
 	if err2 != nil {
 		t.Fatalf("unexpected error")
 	}
@@ -346,7 +348,7 @@ func TestUpdateStatus(t *testing.T) {
 	sort.Sort(loadBalancerIngressByIP(newIPs))
 	fk.updateStatus(newIPs)
 
-	fooIngress1, err1 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_1")
+	fooIngress1, err1 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_1", meta_v1.GetOptions{})
 	if err1 != nil {
 		t.Fatalf("unexpected error")
 	}
@@ -355,7 +357,7 @@ func TestUpdateStatus(t *testing.T) {
 		t.Fatalf("returned %v but expected %v", fooIngress1CurIPs, newIPs)
 	}
 
-	fooIngress2, err2 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_2")
+	fooIngress2, err2 := fk.Client.Extensions().Ingresses(api.NamespaceDefault).Get("foo_ingress_2", meta_v1.GetOptions{})
 	if err2 != nil {
 		t.Fatalf("unexpected error")
 	}

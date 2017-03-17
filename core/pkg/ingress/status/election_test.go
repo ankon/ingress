@@ -21,23 +21,24 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	tc "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	api "k8s.io/client-go/pkg/api/v1"
+
+	"k8s.io/ingress/core/pkg/ingress/status/leaderelection/resourcelock"
 )
 
 func TestGetCurrentLeaderLeaderExist(t *testing.T) {
 	fkER := resourcelock.LeaderElectionRecord{
 		HolderIdentity:       "currentLeader",
 		LeaseDurationSeconds: 30,
-		AcquireTime:          unversioned.Now(),
-		RenewTime:            unversioned.Now(),
+		AcquireTime:          time.Now(),
+		RenewTime:            time.Now(),
 		LeaderTransitions:    3,
 	}
 	leaderInfo, _ := json.Marshal(fkER)
 	fkEndpoints := api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ingress-controller-test",
 			Namespace: api.NamespaceSystem,
 			Annotations: map[string]string{
@@ -45,7 +46,7 @@ func TestGetCurrentLeaderLeaderExist(t *testing.T) {
 			},
 		},
 	}
-	fk := tc.NewSimpleClientset(&api.EndpointsList{Items: []api.Endpoints{fkEndpoints}})
+	fk := fake.NewSimpleClientset(&api.EndpointsList{Items: []api.Endpoints{fkEndpoints}})
 	identity, endpoints, err := getCurrentLeader("ingress-controller-test", api.NamespaceSystem, fk)
 	if err != nil {
 		t.Fatalf("expected identitiy and endpoints but returned error %s", err)
@@ -62,13 +63,13 @@ func TestGetCurrentLeaderLeaderExist(t *testing.T) {
 
 func TestGetCurrentLeaderLeaderNotExist(t *testing.T) {
 	fkEndpoints := api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        "ingress-controller-test",
 			Namespace:   api.NamespaceSystem,
 			Annotations: map[string]string{},
 		},
 	}
-	fk := tc.NewSimpleClientset(&api.EndpointsList{Items: []api.Endpoints{fkEndpoints}})
+	fk := fake.NewSimpleClientset(&api.EndpointsList{Items: []api.Endpoints{fkEndpoints}})
 	identity, endpoints, err := getCurrentLeader("ingress-controller-test", api.NamespaceSystem, fk)
 	if err != nil {
 		t.Fatalf("unexpeted error: %v", err)
@@ -85,7 +86,7 @@ func TestGetCurrentLeaderLeaderNotExist(t *testing.T) {
 
 func TestGetCurrentLeaderAnnotationError(t *testing.T) {
 	fkEndpoints := api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ingress-controller-test",
 			Namespace: api.NamespaceSystem,
 			Annotations: map[string]string{
@@ -103,13 +104,13 @@ func TestGetCurrentLeaderAnnotationError(t *testing.T) {
 func TestNewElection(t *testing.T) {
 	fk := tc.NewSimpleClientset(&api.EndpointsList{Items: []api.Endpoints{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "ingress-controller-test",
 				Namespace: api.NamespaceSystem,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "ingress-controller-test-020",
 				Namespace: api.NamespaceSystem,
 			},
