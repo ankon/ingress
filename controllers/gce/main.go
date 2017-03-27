@@ -26,20 +26,23 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang/glog"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	flag "github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+
 	"k8s.io/ingress/controllers/gce/controller"
 	"k8s.io/ingress/controllers/gce/loadbalancers"
 	"k8s.io/ingress/controllers/gce/storage"
 	"k8s.io/ingress/controllers/gce/utils"
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/wait"
-
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Entrypoint of GLBC. Example invocation:
@@ -50,9 +53,9 @@ import (
 // $ glbc --proxy="http://localhost:proxyport"
 
 const (
-	// lbApiPort is the port on which the loadbalancer controller serves a
+	// lbAPIPort is the port on which the loadbalancer controller serves a
 	// minimal api (/healthz, /delete-all-and-quit etc).
-	lbApiPort = 8081
+	lbAPIPort = 8081
 
 	// A delimiter used for clarity in naming GCE resources.
 	clusterNameDelimiter = "--"
@@ -119,7 +122,7 @@ var (
 		`Path to a file containing the gce config. If left unspecified this
 		controller only works with default zones.`)
 
-	healthzPort = flags.Int("healthz-port", lbApiPort,
+	healthzPort = flags.Int("healthz-port", lbAPIPort,
 		`Port to run healthz server. Must match the health check port in yaml.`)
 )
 
@@ -183,20 +186,23 @@ func main() {
 		glog.Fatalf("Please specify --default-backend")
 	}
 
-	var config *restclient.Config
+	var config *clientcmd.Config
 	// Create kubeclient
 	if *inCluster {
-		if config, err = restclient.InClusterConfig(); err != nil {
+		if config, err := rest.InClusterConfig(); err != nil {
 			glog.Fatalf("error creating client configuration: %v", err)
 		}
 	} else {
-		config, err = clientConfig.ClientConfig()
+		config, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{},
+			&clientcmd.ConfigOverrides{}).ClientConfig()
+
 		if err != nil {
 			glog.Fatalf("error creating client configuration: %v", err)
 		}
 	}
 
-	kubeClient, err := client.NewForConfig(config)
+	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v.", err)
 	}
@@ -247,7 +253,7 @@ func main() {
 	}
 }
 
-func newNamer(kubeClient client.Interface, clusterName string, fwName string) (*utils.Namer, error) {
+func newNamer(kubeClient kubernetes.Interface, clusterName string, fwName string) (*utils.Namer, error) {
 	name, err := getClusterUID(kubeClient, clusterName)
 	if err != nil {
 		return nil, err

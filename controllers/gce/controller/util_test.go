@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -144,7 +144,7 @@ func TestProbeGetterCrossNamespace(t *testing.T) {
 			Labels:            map[string]string{"app-3001": "test"},
 			Name:              fmt.Sprintf("test-pod-new-ns"),
 			Namespace:         "new-ns",
-			CreationTimestamp: unversioned.NewTime(firstPodCreationTime.Add(-time.Duration(time.Hour))),
+			CreationTimestamp: metav1.NewTime(firstPodCreationTime.Add(-time.Duration(time.Hour))),
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -209,7 +209,7 @@ func addPods(lbc *LoadBalancerController, nodePortToHealthCheck map[int64]string
 				Labels:            l,
 				Name:              fmt.Sprintf("%d", np),
 				Namespace:         ns,
-				CreationTimestamp: unversioned.NewTime(firstPodCreationTime.Add(delay)),
+				CreationTimestamp: metav1.NewTime(firstPodCreationTime.Add(delay)),
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{

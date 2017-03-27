@@ -24,18 +24,16 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/apis/extensions"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/util/sets"
+
 	"k8s.io/ingress/controllers/gce/firewalls"
 	"k8s.io/ingress/controllers/gce/loadbalancers"
 	"k8s.io/ingress/controllers/gce/utils"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 const testClusterName = "testcluster"
@@ -52,7 +50,15 @@ func defaultBackendName(clusterName string) string {
 
 // newLoadBalancerController create a loadbalancer controller.
 func newLoadBalancerController(t *testing.T, cm *fakeClusterManager, masterURL string) *LoadBalancerController {
-	client := client.NewForConfigOrDie(&restclient.Config{Host: masterURL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{},
+		&clientcmd.ConfigOverrides{
+			ClusterInfo: clientcmd_api.Cluster{
+				Server: masterURL,
+			},
+		}).ClientConfig()
+
+	//ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}
 	lb, err := NewLoadBalancerController(client, cm.ClusterManager, 1*time.Second, api.NamespaceAll)
 	if err != nil {
 		t.Fatalf("%v", err)

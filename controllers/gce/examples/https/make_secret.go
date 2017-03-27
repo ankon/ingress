@@ -26,8 +26,9 @@ import (
 	"io/ioutil"
 	"log"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	// This installs the legacy v1 API
@@ -59,7 +60,7 @@ func main() {
 	tlsCrt := read(*crt)
 	tlsKey := read(*key)
 	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: *name,
 		},
 		Data: map[string][]byte{

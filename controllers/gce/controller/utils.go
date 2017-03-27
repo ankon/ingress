@@ -22,19 +22,21 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/glog"
+
 	compute "google.golang.org/api/compute/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/util/sets"
+
 	"k8s.io/ingress/controllers/gce/loadbalancers"
 	"k8s.io/ingress/controllers/gce/utils"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/workqueue"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -202,6 +204,21 @@ type StoreToIngressLister struct {
 	cache.Store
 }
 
+// StoreToNodeLister makes a Store that lists Node.
+type StoreToNodeLister struct {
+	cache.Store
+}
+
+// StoreToServiceLister makes a Store that lists Service.
+type StoreToServiceLister struct {
+	cache.Store
+}
+
+// StoreToPodLister makes a Store that lists Pods.
+type StoreToPodLister struct {
+	cache.Store
+}
+
 // List lists all Ingress' in the store.
 func (s *StoreToIngressLister) List() (ing extensions.IngressList, err error) {
 	for _, m := range s.Store.List() {
@@ -334,9 +351,9 @@ func (t *GCETranslator) toGCEBackend(be *extensions.IngressBackend, ns string) (
 // getServiceNodePort looks in the svc store for a matching service:port,
 // and returns the nodeport.
 func (t *GCETranslator) getServiceNodePort(be extensions.IngressBackend, namespace string) (int, error) {
-	obj, exists, err := t.svcLister.Indexer.Get(
+	obj, exists, err := t.svcLister.Store.Get(
 		&api.Service{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: meta_v1.ObjectMeta{
 				Name:      be.ServiceName,
 				Namespace: namespace,
 			},
